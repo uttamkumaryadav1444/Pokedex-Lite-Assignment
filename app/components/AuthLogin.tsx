@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 
 export default function AuthLogin({ onSwitchToSignup }: { onSwitchToSignup: () => void }) {
   const router = useRouter()
@@ -35,8 +36,13 @@ export default function AuthLogin({ onSwitchToSignup }: { onSwitchToSignup: () =
     }
   }
 
+  const handleGoogleLogin = async () => {
+    // Use NextAuth redirect flow to avoid popup issues
+    await signIn('google', { callbackUrl: '/' })
+  }
+
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center gradient-bg py-5">
+    <div suppressHydrationWarning className="min-vh-100 d-flex align-items-center justify-content-center gradient-bg py-5">
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-12 col-md-5">
@@ -121,7 +127,11 @@ export default function AuthLogin({ onSwitchToSignup }: { onSwitchToSignup: () =
                 </div>
 
                 {/* Google Button */}
-                <button className="btn btn-outline-secondary w-100 fw-bold mb-3">
+                <button
+                  onClick={handleGoogleLogin}
+                  className="btn btn-outline-secondary w-100 fw-bold mb-3"
+                  style={{ borderRadius: '8px', padding: '10px' }}
+                >
                   🔵 Sign in with Google
                 </button>
 
