@@ -1,65 +1,220 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect } from 'react'
+import Header from './components/Header'
+import AuthLogin from './components/AuthLogin'
+import AuthSignup from './components/AuthSignup'
+import SearchBar from './components/SearchBar'
+import FilterType from './components/FilterType'
+import PokemonList from './components/PokemonList'
+import Pagination from './components/Pagination'
+import PokemonModal from './components/PokemonModal'
 
 export default function Home() {
+  const [userInfo, setUserInfo] = useState<any>(null)
+  const [showAuth, setShowAuth] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  
+  const [pokemon, setPokemon] = useState<any[]>([])
+  const [filteredPokemon, setFilteredPokemon] = useState<any[]>([])
+  const [favorites, setFavorites] = useState<number[]>([])
+  
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedType, setSelectedType] = useState('')
+  const [types, setTypes] = useState<string[]>([])
+  
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(12)
+  const [selectedPokemon, setSelectedPokemon] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Load user info and favorites
+  useEffect(() => {
+    const savedUser = localStorage.getItem('userInfo')
+    if (savedUser) {
+      setUserInfo(JSON.parse(savedUser))
+    }
+
+    const savedFavorites = localStorage.getItem('favorites')
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites))
+    }
+  }, [])
+
+  // Fetch Pokemon data
+  useEffect(() => {
+    const fetchPokemon = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=151')
+        const data = await response.json()
+
+        const pokemonDetails = await Promise.all(
+          data.results.map(async (poke: any) => {
+            const res = await fetch(poke.url)
+            return res.json()
+          })
+        )
+
+        setPokemon(pokemonDetails || [])
+        setFilteredPokemon(pokemonDetails || [])
+
+        // Extract all unique types
+        const allTypes = new Set<string>()
+        pokemonDetails.forEach((poke: any) => {
+          poke.types?.forEach((type: any) => {
+            allTypes.add(type.type.name)
+          })
+        })
+        setTypes(Array.from(allTypes).sort())
+      } catch (error) {
+        console.error('Error fetching Pokemon:', error)
+        setPokemon([])
+        setFilteredPokemon([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPokemon()
+  }, [])
+
+  // Filter Pokemon
+  useEffect(() => {
+    let filtered = [...pokemon]
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter((poke) =>
+        poke.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Type filter
+    if (selectedType) {
+      filtered = filtered.filter((poke) =>
+        poke.types?.some((type: any) => type.type.name === selectedType)
+      )
+    }
+
+    setFilteredPokemon(filtered)
+    setCurrentPage(1)
+  }, [searchTerm, selectedType, pokemon])
+
+  // Handle favorite toggle
+  const handleFavorite = (id: number) => {
+    const newFavorites = favorites.includes(id)
+      ? favorites.filter((fav) => fav !== id)
+      : [...favorites, id]
+    setFavorites(newFavorites)
+    localStorage.setItem('favorites', JSON.stringify(newFavorites))
+  }
+
+  // Handle logout
+  const handleLogout = () => {
+    setUserInfo(null)
+    setShowAuth(false)
+  }
+
+  // Handle auth switch
+  const handleSwitchToSignup = () => setAuthMode('signup')
+  const handleSwitchToLogin = () => setAuthMode('login')
+
+  // Pagination
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedPokemon = Array.isArray(filteredPokemon)
+    ? filteredPokemon.slice(startIndex, endIndex)
+    : []
+  const totalPages = Math.ceil((filteredPokemon?.length || 0) / itemsPerPage)
+
+  // If not logged in, show auth
+  if (!userInfo) {
+    return (
+      <>
+        {authMode === 'login' ? (
+          <AuthLogin onSwitchToSignup={handleSwitchToSignup} />
+        ) : (
+          <AuthSignup onSwitchToLogin={handleSwitchToLogin} />
+        )}
+      </>
+    )
+  }
+
+  // Main app view
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <Header userInfo={userInfo} onLogout={handleLogout} />
+
+      <div className="container-fluid py-5 px-4">
+        {/* Title */}
+        <div className="mb-5">
+          <h1 className="text-white fw-bold mb-2">
+            🔴 Pokédex - Catch them All!
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <p className="text-white-50">Welcome, {userInfo.name}! Explore and collect your favorite Pokémon</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Search & Filter */}
+        <div className="row mb-4">
+          <div className="col-12 col-md-6 mb-3 mb-md-0">
+            <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+          </div>
+          <div className="col-12 col-md-6">
+            <FilterType
+              types={types}
+              selectedType={selectedType}
+              setSelectedType={setSelectedType}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
         </div>
-      </main>
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="text-center py-5">
+            <div className="spinner-border text-white" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="text-white mt-3">Loading Pokémon...</p>
+          </div>
+        ) : (
+          <>
+            {/* Pokemon List */}
+            <PokemonList
+              pokemon={paginatedPokemon}
+              favorites={favorites}
+              onFavorite={handleFavorite}
+              onSelectPokemon={setSelectedPokemon}
+            />
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
+
+            {/* Results Count */}
+            <div className="text-center mt-5">
+              <p className="text-white-50 small">
+                Showing {paginatedPokemon.length} of {filteredPokemon?.length || 0} Pokémon
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Pokemon Detail Modal */}
+      {selectedPokemon && (
+        <PokemonModal
+          pokemon={selectedPokemon}
+          isFavorited={favorites.includes(selectedPokemon.id)}
+          onFavorite={() => handleFavorite(selectedPokemon.id)}
+          onClose={() => setSelectedPokemon(null)}
+        />
+      )}
     </div>
-  );
+  )
 }
